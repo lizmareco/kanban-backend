@@ -70,13 +70,14 @@ exports.getCardsByList = async (req, res) => {
   const { listId } = req.params;
 
   try {
-    // Obtener las tarjetas de la lista
+    // Obtener las tarjetas de la lista y determinar si están vencidas
     const cards = await pool.query(
       `SELECT *, CASE
-        WHEN fecha_vencimiento < NOW() THEN TRUE
+        WHEN fecha_vencimiento <= NOW() THEN TRUE
         ELSE FALSE
       END AS atrasada
-      FROM cards WHERE lista_id = $1 ORDER BY id`,
+      FROM cards WHERE lista_id = $1
+      ORDER BY id`,
       [listId]
     );
 
