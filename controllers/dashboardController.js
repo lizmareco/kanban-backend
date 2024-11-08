@@ -1,82 +1,67 @@
-// controllers/dashboardController.js
-const pool = require('../db'); // Conexión a la base de datos
-const moment = require('moment'); // Biblioteca para manejar fechas y horas
+// src/controllers/dashboardController.js
 
-// Obtener datos del dashboard para el usuario autenticado
-exports.getBoardStats = async (req, res) => {
-  const userId = req.user.id;
+const pool = require('../db'); // Importar la conexión a la base de datos
+
+// Obtener las estadísticas del dashboard para un tablero
+exports.getBoardStatistics = async (req, res) => {
+  const { boardId } = req.params;
 
   try {
-    // Obtener la cantidad de workspaces del usuario
-    const workspacesResult = await pool.query(
-      'SELECT COUNT(*) FROM workspaces WHERE usuario_id = $1',
-      [userId]
+    // 1. Contar las tareas por estado
+    const tasksByStatusResult = await pool.query(
+      `SELECT estado, COUNT(*) as cantidad
+       FROM cards
+       WHERE lista_id IN (SELECT id FROM lists WHERE board_id = $1)
+       GROUP BY estado`,
+      [boardId]
     );
-    const totalWorkspaces = parseInt(workspacesResult.rows[0].count, 10);
 
-    // Obtener la cantidad de boards del usuario
-    const boardsResult = await pool.query(
-      'SELECT COUNT(*) FROM boards WHERE usuario_id = $1',
-      [userId]
+    // 2. Contar las tareas atrasadas
+    const overdueTasksResult = await pool.query(
+      `SELECT COUNT(*) as cantidad_atrasadas
+       FROM cards
+       WHERE lista_id IN (SELECT id FROM lists WHERE board_id = $1)
+       AND fecha_vencimiento <= NOW()`,
+      [boardId]
     );
-    const totalBoards = parseInt(boardsResult.rows[0].count, 10);
 
-    // Obtener la cantidad de listas del usuario
-    const listsResult = await pool.query(
-      `SELECT COUNT(*) FROM lists 
-       WHERE board_id IN (SELECT id FROM boards WHERE usuario_id = $1)`,
-      [userId]
+    // 3. Contar las tareas por usuario asignado
+    const tasksByUserResult = await pool.query(
+      `SELECT usuario_asignado, COUNT(*) as cantidad
+       FROM cards
+       WHERE lista_id IN (SELECT id FROM lists WHERE board_id = $1)
+       GROUP BY usuario_asignado`,
+      [boardId]
     );
-    const totalLists = parseInt(listsResult.rows[0].count, 10);
 
-    // Obtener la cantidad de tarjetas del usuario
-    const cardsResult = await pool.query(
-      `SELECT COUNT(*) FROM cards 
-       WHERE list_id IN (
-         SELECT id FROM lists 
-         WHERE board_id IN (SELECT id FROM boards WHERE usuario_id = $1)
-       )`,
-      [userId]
-    );
-    const totalCards = parseInt(cardsResult.rows[0].count, 10);
+    // Procesar los resultados para responder en el formato adecuado
 
-    // Obtener las tarjetas atrasadas
-    const overdueCardsResult = await pool.query(
-      `SELECT * FROM cards 
-       WHERE due_date < NOW() AND completed = false
-       AND list_id IN (
-         SELECT id FROM lists 
-         WHERE board_id IN (SELECT id FROM boards WHERE usuario_id = $1)
-       )`,
-      [userId]
-    );
-    const overdueCards = overdueCardsResult.rows;
+    // Tareas por estado
+    const tasksByStatus = {};
+    tasksByStatusResult.rows.forEach(row => {
+      tasksByStatus[row.estado] = parseInt(row.cantidad);
+    });
 
-    // Obtener las tarjetas para hoy
-    const todayCardsResult = await pool.query(
-      `SELECT * FROM cards 
-       WHERE due_date::date = NOW()::date AND completed = false
-       AND list_id IN (
-         SELECT id FROM lists 
-         WHERE board_id IN (SELECT id FROM boards WHERE usuario_id = $1)
-       )`,
-      [userId]
-    );
-    const todayCards = todayCardsResult.rows;
+    // Tareas atrasadas
+    const overdueTasks = parseInt(overdueTasksResult.rows[0].cantidad_atrasadas);
 
-    // Enviar los datos al cliente
+    // Tareas por usuario asignado
+    const tasksByUser = {};
+    tasksByUserResult.rows.forEach(row => {
+      tasksByUser[row.usuario_asignado] = parseInt(row.cantidad);
+    });
+
+    // Responder con las estadísticas
     res.status(200).json({
-      totalWorkspaces,
-      totalBoards,
-      totalLists,
-      totalCards,
-      overdueCards,
-      todayCards,
+      tasksByStatus,
+      overdueTasks,
+      tasksByUser,
     });
   } catch (error) {
-    console.error('Error al obtener los datos del dashboard:', error);
+    console.error('Error al obtener las estadísticas del tablero:', error);
     res.status(500).json({ msg: 'Error en el servidor' });
   }
 };
+
 
   

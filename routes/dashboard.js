@@ -1,9 +1,12 @@
-// routes/dashboard.js
+// src/routes/dashboard.js
+
 const express = require('express');
 const router = express.Router();
-const { getBoardStats } = require('../controllers/dashboardController');
-const auth = require('../middleware/auth');
+const dashboardController = require('../controllers/dashboardController');
+const authMiddleware = require('../middleware/auth');
 
-router.get('/:boardId', auth, getBoardStats);
+// Ruta para obtener las estadísticas del dashboard de un tablero
+router.get('/boards/:boardId', authMiddleware, dashboardController.getBoardStatistics);
 
 module.exports = router;
+
