@@ -25,12 +25,13 @@ exports.getBoardStatistics = async (req, res) => {
       [boardId]
     );
 
-    // 3. Contar las tareas por usuario asignado
+    // 3. Contar las tareas por usuario asignado, incluyendo el nombre del usuario
     const tasksByUserResult = await pool.query(
-      `SELECT usuario_asignado, COUNT(*) as cantidad
+      `SELECT COALESCE(usuarios.nombre, 'Sin Asignar') AS usuario_nombre, COUNT(cards.id) as cantidad
        FROM cards
+       LEFT JOIN usuarios ON cards.usuario_asignado = usuarios.id
        WHERE lista_id IN (SELECT id FROM lists WHERE board_id = $1)
-       GROUP BY usuario_asignado`,
+       GROUP BY usuarios.nombre`,
       [boardId]
     );
 
@@ -48,7 +49,7 @@ exports.getBoardStatistics = async (req, res) => {
     // Tareas por usuario asignado
     const tasksByUser = {};
     tasksByUserResult.rows.forEach(row => {
-      tasksByUser[row.usuario_asignado] = parseInt(row.cantidad);
+      tasksByUser[row.usuario_nombre] = parseInt(row.cantidad);
     });
 
     // Responder con las estadísticas

@@ -72,15 +72,18 @@ exports.getCardsByList = async (req, res) => {
   try {
     // Obtener las tarjetas de la lista y determinar si están vencidas
     const cards = await pool.query(
-      `SELECT *, CASE
-        WHEN fecha_vencimiento <= NOW() THEN TRUE
+      `SELECT cards.id, cards.nombre, cards.descripcion, cards.etiqueta, cards.activo, cards.fecha_creacion,
+        cards.fecha_vencimiento, cards.lista_id, cards.posicion, usuarios.nombre, CASE
+        WHEN cards.fecha_vencimiento <= NOW() THEN TRUE
         ELSE FALSE
       END AS atrasada
-      FROM cards WHERE lista_id = $1
-      ORDER BY id`,
+      FROM cards
+      LEFT JOIN usuarios ON cards.usuario_asignado = usuarios.id
+      WHERE cards.lista_id = $1
+      ORDER BY cards.id`,
       [listId]
     );
-
+    console.log(cards.rows)
     res.status(200).json(cards.rows);
   } catch (error) {
     console.error('Error al obtener las tarjetas:', error);
@@ -109,45 +112,23 @@ exports.updateCard = async (req, res) => {
 
 // Mover una tarjeta a otra lista o posición
 exports.moveCard = async (req, res) => {
-  const { cardId } = req.params;
+  const { id } = req.params; // Cambiado de cardId a id
   const { listId, position } = req.body;
 
   try {
-    // Obtener la tarjeta a mover
-    const card = await pool.query(
-      'SELECT * FROM cards WHERE id = $1',
-      [cardId]
+    const updatedCard = await pool.query(
+      `UPDATE cards
+       SET lista_id = $1, posicion = $2
+       WHERE id = $3
+       RETURNING *`,
+      [listId, position, id] // Cambiado de cardId a id
     );
 
-    if (card.rows.length === 0) {
+    if (updatedCard.rows.length === 0) {
       return res.status(404).json({ msg: 'Tarjeta no encontrada' });
     }
 
-    // Obtener el nombre de la lista de destino
-    const lista = await pool.query(
-      'SELECT nombre FROM lists WHERE id = $1',
-      [listId]
-    );
-
-    if (lista.rows.length === 0) {
-      return res.status(404).json({ msg: 'Lista de destino no encontrada' });
-    }
-
-    const estado = lista.rows[0].nombre; // El estado es el nombre de la lista de destino
-
-    // Actualizar la posición de las tarjetas en la lista de destino
-    await pool.query(
-      'UPDATE cards SET posicion = posicion + 1 WHERE lista_id = $1 AND posicion >= $2',
-      [listId, position]
-    );
-
-    // Mover la tarjeta a la nueva lista y posición
-    const movedCard = await pool.query(
-      'UPDATE cards SET lista_id = $1, posicion = $2, estado = $3 WHERE id = $4 RETURNING *',
-      [listId, position, estado, cardId]
-    );
-
-    res.status(200).json(movedCard.rows[0]);
+    res.status(200).json(updatedCard.rows[0]);
   } catch (error) {
     console.error('Error al mover la tarjeta:', error);
     res.status(500).json({ msg: 'Error en el servidor' });
