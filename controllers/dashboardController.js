@@ -9,10 +9,12 @@ exports.getBoardStatistics = async (req, res) => {
   try {
     // 1. Contar las tareas por estado
     const tasksByStatusResult = await pool.query(
-      `SELECT estado, COUNT(*) as cantidad
-       FROM cards
-       WHERE lista_id IN (SELECT id FROM lists WHERE board_id = $1)
-       GROUP BY estado`,
+      `SELECT l.nombre as estado, COUNT(c.id) as cantidad
+FROM cards c
+JOIN lists l ON c.lista_id = l.id
+WHERE l.board_id = $1 AND l.activo = TRUE
+GROUP BY l.nombre
+ORDER BY l.nombre;`,
       [boardId]
     );
 

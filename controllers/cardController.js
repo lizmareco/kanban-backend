@@ -73,17 +73,17 @@ exports.getCardsByList = async (req, res) => {
     // Obtener las tarjetas de la lista y determinar si están vencidas
     const cards = await pool.query(
       `SELECT cards.id, cards.nombre, cards.descripcion, cards.etiqueta, cards.activo, cards.fecha_creacion,
-        cards.fecha_vencimiento, cards.lista_id, cards.posicion, usuarios.nombre, CASE
-        WHEN cards.fecha_vencimiento <= NOW() THEN TRUE
-        ELSE FALSE
-      END AS atrasada
+       cards.fecha_vencimiento, cards.lista_id, cards.posicion, usuarios.nombre AS usuario_nombre, CASE
+       WHEN cards.fecha_vencimiento <= NOW() THEN TRUE
+       ELSE FALSE
+       END AS atrasada
       FROM cards
       LEFT JOIN usuarios ON cards.usuario_asignado = usuarios.id
       WHERE cards.lista_id = $1
       ORDER BY cards.id`,
       [listId]
     );
-    console.log(cards.rows)
+    console.log(cards.rows); // Aquí se muestra el resultado de la consulta en la consola del servidor.
     res.status(200).json(cards.rows);
   } catch (error) {
     console.error('Error al obtener las tarjetas:', error);

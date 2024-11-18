@@ -24,6 +24,7 @@ const listRoutes = require('./routes/lists');
 //const listRoutes = require('./routes/listRoutes');
 const cardRoutes = require('./routes/cards');
 const dashboardRoutes = require('./routes/dashboard');
+const tasksRoutes = require('./routes/tasks');
 
 // Conectar a la base de datos
 const pool = require('./db'); // Asegúrate de tener un archivo db.js configurado
@@ -66,6 +67,7 @@ app.use('/boards', boardRoutes);
 app.use('/lists', listRoutes);
 app.use('/cards', cardRoutes);
 app.use('/dashboard', dashboardRoutes);
+app.use('/tasks', tasksRoutes); 
 
 // Ruta de prueba para verificar el estado del servidor
 app.get('/health', (req, res) => {
