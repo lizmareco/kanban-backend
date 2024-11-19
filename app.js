@@ -67,7 +67,8 @@ app.use('/boards', boardRoutes);
 app.use('/lists', listRoutes);
 app.use('/cards', cardRoutes);
 app.use('/dashboard', dashboardRoutes);
-app.use('/tasks', tasksRoutes); 
+//app.use('/tasks', tasksRoutes);
+app.use('/cards', tasksRoutes);
 
 // Ruta de prueba para verificar el estado del servidor
 app.get('/health', (req, res) => {

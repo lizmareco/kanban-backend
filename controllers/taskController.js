@@ -1,85 +1,112 @@
 // controllers/taskController.js
+const db = require('../db');
 
-const pool = require('../db');
-
-// Obtener las tareas relacionadas con una tarjeta específica
-exports.getTasksByCard = async (req, res) => {
-  const { cardId } = req.params;
-
-  try {
-    const tasks = await pool.query(
-      'SELECT * FROM tasks WHERE card_id = $1',
-      [cardId]
-    );
-
-    res.status(200).json(tasks.rows);
-  } catch (error) {
-    console.error('Error al obtener las tareas:', error);
-    res.status(500).json({ msg: 'Error en el servidor' });
-  }
-};
-
-// Crear una nueva tarea
 exports.createTask = async (req, res) => {
-  console.log("Solicitud para crear tarea recibida", req.params, req.body);
-  const { cardId } = req.params;
-  const { nombre, descripcion, estado, fecha_vencimiento } = req.body;
-
   try {
-    const result = await pool.query(
+    const { cardId } = req.params;
+    const { nombre, descripcion, estado, fecha_vencimiento } = req.body;
+
+    const result = await db.query(
       'INSERT INTO tasks (card_id, nombre, descripcion, estado, fecha_vencimiento) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [cardId, nombre, descripcion, estado, fecha_vencimiento]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Error al crear la tarea:', error.message);
-    res.status(500).json({ msg: 'Error en el servidor' });
+    res.status(500).json({ error: 'Error al crear la tarea' });
   }
 };
 
-// Actualizar una tarea específica
-exports.updateTask = async (req, res) => {
-  const { id } = req.params;
-  const { nombre, descripcion, estado, fecha_vencimiento } = req.body;
-
-  // Verificar que el nombre no sea nulo o vacío
-  if (!nombre) {
-    return res.status(400).json({ msg: "El campo 'nombre' es obligatorio" });
-  }
-
+exports.getTasksByCardId = async (req, res) => {
   try {
-    const result = await pool.query(
-      `UPDATE tasks
-       SET nombre = $1, descripcion = $2, estado = $3, fecha_vencimiento = $4
-       WHERE id = $5
-       RETURNING *`,
-      [nombre, descripcion, estado, fecha_vencimiento, id]
+    const { cardId } = req.params;
+
+    const result = await db.query(
+      'SELECT * FROM tasks WHERE card_id = $1',
+      [cardId]
     );
 
+    res.status(200).json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener las tareas' });
+  }
+};
+
+exports.updateTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, descripcion, estado, fecha_vencimiento } = req.body;
+
+    // Log de los datos recibidos para depuración
+    console.log('Datos recibidos para actualizar:', req.body);
+
+    // Construir dinámicamente la consulta SQL para actualizaciones parciales
+    const fields = [];
+    const values = [];
+    let query = 'UPDATE tasks SET ';
+
+    if (nombre !== undefined) {
+      values.push(nombre);
+      fields.push(`nombre = $${values.length}`);
+    }
+
+    if (descripcion !== undefined) {
+      values.push(descripcion);
+      fields.push(`descripcion = $${values.length}`);
+    }
+
+    if (estado !== undefined) {
+      // Validar el valor de 'estado'
+      if (!['open', 'closed'].includes(estado)) {
+        return res.status(400).json({ error: 'Estado inválido. Debe ser "open" o "closed".' });
+      }
+      values.push(estado);
+      fields.push(`estado = $${values.length}`);
+    }
+
+    if (fecha_vencimiento !== undefined) {
+      values.push(fecha_vencimiento);
+      fields.push(`fecha_vencimiento = $${values.length}`);
+    }
+
+    // Verificar si se proporcionaron campos para actualizar
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No se proporcionaron campos para actualizar.' });
+    }
+
+    // Completar la consulta SQL
+    query += fields.join(', ') + ` WHERE id = $${values.length + 1} RETURNING *`;
+    values.push(id);
+
+    // Ejecutar la consulta SQL
+    const result = await db.query(query, values);
+
+    // Verificar si la tarea fue encontrada y actualizada
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada.' });
+    }
+
+    // Devolver la tarea actualizada
     res.status(200).json(result.rows[0]);
   } catch (error) {
     console.error('Error al actualizar la tarea:', error);
-    res.status(500).json({ msg: 'Error en el servidor' });
+    res.status(500).json({ error: 'Error al actualizar la tarea' });
   }
 };
 
-// Eliminar una tarea específica
 exports.deleteTask = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const result = await pool.query('DELETE FROM tasks WHERE id = $1 RETURNING *', [id]);
+    const { id } = req.params;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ msg: 'Tarea no encontrada' });
-    }
+    await db.query('DELETE FROM tasks WHERE id = $1', [id]);
 
-    res.status(200).json({ msg: 'Tarea eliminada exitosamente' });
+    res.status(200).json({ message: 'Tarea eliminada' });
   } catch (error) {
-    console.error('Error al eliminar la tarea:', error);
-    res.status(500).json({ msg: 'Error en el servidor' });
+    res.status(500).json({ error: 'Error al eliminar la tarea' });
   }
 };
+
+
+
 
 
