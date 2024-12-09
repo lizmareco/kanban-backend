@@ -20,7 +20,7 @@ exports.createTask = async (req, res) => {
 exports.getTasksByCardId = async (req, res) => {
   try {
     const { cardId } = req.params;
-
+    console.log('Obteniendo tareas para la tarjeta:', cardId);
     const result = await db.query(
       'SELECT * FROM tasks WHERE card_id = $1',
       [cardId]
@@ -28,7 +28,8 @@ exports.getTasksByCardId = async (req, res) => {
 
     res.status(200).json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener las tareas' });
+    console.error('Error en getTasksByCardId:', error); // Log detallado
+    return res.status(500).json({ error: 'Error al obtener las tareas' });
   }
 };
 

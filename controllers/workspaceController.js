@@ -79,3 +79,38 @@ exports.deactivateWorkspace = async (req, res) => {
     res.status(500).json({ msg: 'Error en el servidor' });
   }
 };
+
+exports.updateWorkspaceName = async (req, res) => {
+  const userId = req.user.id;
+  const { workspaceId } = req.params;
+  const { nombre } = req.body;
+
+  if (!nombre || typeof nombre !== 'string' || !nombre.trim()) {
+    return res.status(400).json({ msg: 'El nombre es requerido y debe ser una cadena no vacía.' });
+  }
+
+  try {
+    // Verificar que el workspace pertenece al usuario
+    const workspaceResult = await pool.query(
+      'SELECT * FROM workspaces WHERE id = $1 AND creador_id = $2 AND activo = true',
+      [workspaceId, userId]
+    );
+
+    if (workspaceResult.rows.length === 0) {
+      return res.status(404).json({ msg: 'Espacio de trabajo no encontrado o no te pertenece.' });
+    }
+
+    await pool.query(
+      'UPDATE workspaces SET nombre = $1 WHERE id = $2',
+      [nombre, workspaceId]
+    );
+
+    res.status(200).json({ msg: 'Nombre del espacio de trabajo actualizado exitosamente.' });
+  } catch (error) {
+    console.error('Error al actualizar el nombre del espacio de trabajo:', error);
+    res.status(500).json({ msg: 'Error en el servidor' });
+  }
+};
+
+
+

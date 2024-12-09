@@ -32,11 +32,12 @@ exports.createList = async (req, res) => {
 };
 
 // Obtener todas las listas de un tablero
+// Obtener todas las listas de un tablero
 exports.getListsByBoard = async (req, res) => {
   const { boardId } = req.params;
 
   try {
-    // Verificar si el tablero pertenece al usuario autenticado
+    // Verificar si el tablero existe
     const boardResult = await pool.query(
       'SELECT * FROM boards WHERE id = $1',
       [boardId]
@@ -52,13 +53,20 @@ exports.getListsByBoard = async (req, res) => {
       [boardId]
     );
 
-    // Para cada lista, obtener sus tarjetas asociadas
+    // Para cada lista, obtener sus tarjetas asociadas con JOIN a usuarios
     const lists = await Promise.all(
       listsResult.rows.map(async (list) => {
         const cardsResult = await pool.query(
-          'SELECT * FROM cards WHERE lista_id = $1 ORDER BY id',
+          `SELECT cards.id, cards.nombre, cards.descripcion, cards.etiqueta, cards.activo, cards.fecha_creacion,
+                  cards.fecha_vencimiento, cards.lista_id, cards.posicion, usuarios.nombre AS usuario_nombre,
+                  CASE WHEN cards.fecha_vencimiento <= NOW() THEN TRUE ELSE FALSE END AS atrasada
+           FROM cards
+           LEFT JOIN usuarios ON cards.usuario_asignado = usuarios.id
+           WHERE cards.lista_id = $1
+           ORDER BY cards.id`,
           [list.id]
         );
+
         return {
           ...list,
           cards: cardsResult.rows,
@@ -72,6 +80,7 @@ exports.getListsByBoard = async (req, res) => {
     res.status(500).json({ msg: 'Error en el servidor' });
   }
 };
+
 
 
 // Actualizar una lista

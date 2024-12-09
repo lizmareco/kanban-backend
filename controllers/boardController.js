@@ -1,14 +1,12 @@
 // controllers/boardController.js
 
-const pool = require('../db'); // Conexión a la base de datos
+const pool = require('../db');
 
 // Obtener todos los tableros del usuario autenticado
 exports.getBoards = async (req, res) => {
   const { workspaceId } = req.query;
 
   try {
-    // Asegúrate de que la consulta no esté usando 'usuario_id'
-    // sino que coincida con las columnas existentes en la tabla 'boards'
     const boards = await pool.query(
       'SELECT * FROM boards WHERE workspace_id = $1 AND activo = TRUE',
       [workspaceId]
@@ -34,13 +32,31 @@ exports.createBoard = async (req, res) => {
       'INSERT INTO boards (nombre, descripcion, workspace_id, activo) VALUES ($1, $2, $3, TRUE) RETURNING *',
       [nombre, descripcion, workspaceId]
     );
-    res.status(201).json(result.rows[0]);
+
+    const board = result.rows[0];
+    const boardId = board.id;
+
+    // Listas por defecto
+    const defaultLists = [
+      { nombre: 'Pendiente', position: 1 },
+      { nombre: 'En curso', position: 2 },
+      { nombre: 'Finalizado', position: 3 }
+    ];
+
+    // Insertar las 3 listas por defecto con maxwip = 5
+    for (const lst of defaultLists) {
+      await pool.query(
+        'INSERT INTO lists (nombre, board_id, position, activo, maxwip) VALUES ($1, $2, $3, TRUE, 5)',
+        [lst.nombre, boardId, lst.position]
+      );
+    }
+
+    res.status(201).json(board);
   } catch (error) {
     console.error('Error al crear el tablero:', error);
     res.status(500).json({ msg: 'Error en el servidor' });
   }
 };
-
 
 // Obtener un tablero específico por ID
 exports.getBoardById = async (req, res) => {
@@ -99,6 +115,7 @@ exports.deleteBoard = async (req, res) => {
     res.status(500).json({ msg: 'Error en el servidor' });
   }
 };
+
 
 
 
