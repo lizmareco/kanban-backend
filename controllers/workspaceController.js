@@ -112,5 +112,23 @@ exports.updateWorkspaceName = async (req, res) => {
   }
 };
 
+// btener usuarios del workspace
+exports.getUsersByWorkspace = async (req, res) => {
+  const { workspaceId } = req.params;
+  try {
+    // Consulta la tabla workspace_users para obtener los usuario_id del workspace
+    // Luego unir con la tabla usuarios para obtener el nombre
+    const result = await pool.query(`
+      SELECT u.id, u.nombre
+      FROM workspace_users wu
+      JOIN usuarios u ON wu.usuario_id = u.id
+      WHERE wu.workspace_id = $1
+    `, [workspaceId]);
 
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error('Error al obtener usuarios del workspace:', error);
+    res.status(500).json({ msg: 'Error en el servidor' });
+  }
+};
 
