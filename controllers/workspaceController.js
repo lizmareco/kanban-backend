@@ -3,15 +3,22 @@ const pool = require('../db'); //
 const moment = require('moment'); // Si necesitas manejar fechas
 const { validationResult } = require('express-validator'); // Si utilizas express-validator para validaciones
 
-// Obtener espacios de trabajo
 exports.getWorkspaces = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    // Obtener los espacios donde el usuario es creador o está asignado
     const result = await pool.query(
-      'SELECT * FROM workspaces WHERE creador_id = $1 AND activo = true ORDER BY id DESC',
+      `
+      SELECT DISTINCT w.*
+      FROM workspaces w
+      LEFT JOIN workspace_users wu ON wu.workspace_id = w.id
+      WHERE (w.creador_id = $1 OR wu.usuario_id = $1) AND w.activo = true
+      ORDER BY w.id DESC
+      `,
       [userId]
     );
+
     res.status(200).json(result.rows);
   } catch (error) {
     console.error('Error al obtener los espacios de trabajo:', error);
@@ -20,6 +27,8 @@ exports.getWorkspaces = async (req, res) => {
 };
 
 // Crear un nuevo espacio de trabajo
+
+// controllers/workspaceController.js
 
 exports.createWorkspace = async (req, res) => {
   const { nombre, descripcion, usuariosAsignados } = req.body;
@@ -34,15 +43,19 @@ exports.createWorkspace = async (req, res) => {
 
     const workspaceId = result.rows[0].id;
 
-    // Asignar los usuarios al espacio de trabajo
-    for (const usuarioId of usuariosAsignados) {
+    // Asegurar que el creador del workspace esté incluido en los usuarios asignados
+    const usuarios = new Set(usuariosAsignados); // Eliminar duplicados si existen
+    usuarios.add(creador_id); // Agregar al creador
+
+    // Insertar los usuarios en la tabla workspace_users
+    for (const usuarioId of usuarios) {
       await pool.query(
         'INSERT INTO workspace_users (workspace_id, usuario_id) VALUES ($1, $2)',
         [workspaceId, usuarioId]
       );
     }
 
-    // Enviar la respuesta al cliente
+    // Responder con éxito
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error al crear el workspace:', error);
@@ -113,21 +126,22 @@ exports.updateWorkspaceName = async (req, res) => {
 };
 
 // btener usuarios del workspace
+
 exports.getUsersByWorkspace = async (req, res) => {
   const { workspaceId } = req.params;
+
   try {
-    // Consulta la tabla workspace_users para obtener los usuario_id del workspace
-    // Luego unir con la tabla usuarios para obtener el nombre
-    const result = await pool.query(`
-      SELECT u.id, u.nombre
-      FROM workspace_users wu
-      JOIN usuarios u ON wu.usuario_id = u.id
-      WHERE wu.workspace_id = $1
-    `, [workspaceId]);
+    const result = await pool.query(
+      `SELECT u.id, u.nombre, u.email
+       FROM usuarios u
+       INNER JOIN workspace_users wu ON u.id = wu.usuario_id
+       WHERE wu.workspace_id = $1`,
+      [workspaceId]
+    );
 
     res.status(200).json(result.rows);
   } catch (error) {
-    console.error('Error al obtener usuarios del workspace:', error);
+    console.error('Error al obtener los usuarios del workspace:', error);
     res.status(500).json({ msg: 'Error en el servidor' });
   }
 };
